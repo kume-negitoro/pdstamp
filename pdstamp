@@ -1,0 +1,45 @@
+#!/bin/bash
+
+# 引数のチェック
+if [ $# -ne 3 ]; then
+    echo "Usage: $0 <input_pdf> <output_pdf> <stamp_text>"
+    exit 1
+fi
+
+# 引数から値を取得
+input_pdf="$1"
+output_pdf="$2"
+stamp_text="$3"
+
+# フォントサイズとテキストの位置（右上からのX, Yオフセット）
+font_size=12
+
+offset_x=70
+offset_y=50
+
+# PDFの1ページ目のサイズを取得
+page_size=$(pdfinfo "$input_pdf" | grep "Page size:" | awk '{print $3, $5}')
+page_width=$(echo $page_size | cut -d ' ' -f 1)
+page_height=$(echo $page_size | cut -d ' ' -f 2)
+
+# テキストの位置を計算（右上からのオフセット）
+text_x=$(echo "$page_width - $offset_x" | bc)
+text_y=$(echo "$page_height - $offset_y" | bc)
+
+# 一意なIDを生成（プロセスIDを使用）
+pid=$$
+
+# スタンプ用のPDFを作成
+gs -dQUIET -o stamp_$pid.pdf -sDEVICE=pdfwrite -c "/Japanese-Mincho-Regular-UniJIS-UTF8-H findfont $font_size scalefont setfont $text_x $text_y moveto ($stamp_text) show showpage"
+
+# 1ページ目にスタンプを適用
+pdftk "$input_pdf" stamp stamp_$pid.pdf output temp_stamped_$pid.pdf
+
+# スタンプが適用された1ページ目と元のPDFの残りのページを結合
+pdftk temp_stamped_$pid.pdf cat 1 output temp_first_page_$pid.pdf
+pdftk "$input_pdf" cat 2-end output temp_remaining_pages_$pid.pdf
+pdftk temp_first_page_$pid.pdf temp_remaining_pages_$pid.pdf cat output "$output_pdf"
+
+# 一時ファイルとスタンプ用PDFを削除
+rm stamp_$pid.pdf temp_stamped_$pid.pdf temp_first_page_$pid.pdf temp_remaining_pages_$pid.pdf
+
