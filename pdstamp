@@ -35,11 +35,19 @@ gs -dQUIET -o stamp_$pid.pdf -sDEVICE=pdfwrite -c "/Japanese-Mincho-Regular-UniJ
 # 1ページ目にスタンプを適用
 pdftk "$input_pdf" stamp stamp_$pid.pdf output temp_stamped_$pid.pdf
 
-# スタンプが適用された1ページ目と元のPDFの残りのページを結合
-pdftk temp_stamped_$pid.pdf cat 1 output temp_first_page_$pid.pdf
-pdftk "$input_pdf" cat 2-end output temp_remaining_pages_$pid.pdf
-pdftk temp_first_page_$pid.pdf temp_remaining_pages_$pid.pdf cat output "$output_pdf"
+# PDFのページ数を取得
+page_count=$(pdfinfo "$input_pdf" | grep "Pages:" | awk '{print $2}')
+
+# スタンプが適用された1ページ目と元のPDFの残りのページを結合（PDFが1ページのみの場合を除く）
+if [ "$page_count" -eq 1 ]; then
+    mv temp_stamped_$pid.pdf "$output_pdf"
+else
+    pdftk temp_stamped_$pid.pdf cat 1 output temp_first_page_$pid.pdf
+    pdftk "$input_pdf" cat 2-end output temp_remaining_pages_$pid.pdf
+    pdftk temp_first_page_$pid.pdf temp_remaining_pages_$pid.pdf cat output "$output_pdf"
+    rm temp_first_page_$pid.pdf temp_remaining_pages_$pid.pdf
+fi
 
 # 一時ファイルとスタンプ用PDFを削除
-rm stamp_$pid.pdf temp_stamped_$pid.pdf temp_first_page_$pid.pdf temp_remaining_pages_$pid.pdf
+rm stamp_$pid.pdf temp_stamped_$pid.pdf
 
